@@ -87,8 +87,8 @@ class MapToSynsets(StatelessTransform):
     def _text_to_synsets(self, text):
         result = []
         for word in text.split():
-            ss = nltk.wordnet.wordnet.synsets(word)
-            result.extend(str(s) for s in ss if ".n." not in str(s))
+            ss = nltk.wordnet.wordnet.synsets(word) # return a list of possible definitions
+            result.extend(str(s) for s in ss if ".n." not in str(s)) # get the definitions that are not noun.
         return " ".join(result)
 
 
@@ -119,7 +119,7 @@ class ClassifierOvOAsFeatures:
         `X` is expected to be an array-like or a sparse matrix.
         `y` is expected to be an array-like containing the classes to learn.
         """
-        self.classifiers = fit_ovo(SGDClassifier(), X, numpy.array(y), n_jobs=-1)[0]
+        self.classifiers = fit_ovo(SGDClassifier(), X, numpy.array(y), n_jobs=-1)[0] # n_jobs = -1: all CPU are used
         return self
 
     def transform(self, X, y=None):

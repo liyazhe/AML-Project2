@@ -173,12 +173,16 @@ def build_text_extraction(binary, min_df, ngram, stopwords):
 
 
 def build_synset_extraction(binary, min_df, ngram):
+    # Steps:
+    # 1. MapToSynsets: transform words to Synset
+    # 2. CountVectorize: Convert a collection of text documents to a matrix of token counts
+    # 3. Classifier0v0AsFeatures: type of generalization to k classes
     return make_pipeline(MapToSynsets(),
                          CountVectorizer(binary=binary,
                                          tokenizer=lambda x: x.split(),
                                          min_df=min_df,
                                          ngram_range=(1, ngram)),
-                         ClassifierOvOAsFeatures())
+                         ClassifierOvOAsFeatures()) #Convert a collection of text documents to a matrix of token counts
 
 
 def build_lex_extraction(binary, min_df, ngram):
