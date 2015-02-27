@@ -13,8 +13,9 @@ from sklearn.pipeline import make_pipeline, make_union
 from sklearn.metrics import accuracy_score
 
 from samr.transformations import (ExtractText, ReplaceText, MapToSynsets,
-                                  Densifier, ClassifierOvOAsFeatures)
-from samr.inquirer_lex_transform import InquirerLexTransform
+                                  Densifier, ClassifierOvOAsFeatures,ExtractLemma, MapToOsgoodScores,
+                                  MapToSenti,MapToPartOfSpeech,ReplaceNegation)
+from samr.inquirer_lex_transform import (InquirerLexTransform)
 
 
 _valid_classifiers = {
@@ -55,7 +56,7 @@ class PhraseSentimentPredictor:
     def __init__(self, classifier="sgd", classifier_args=None, lowercase=True,
                  text_replacements=None, map_to_synsets=False, binary=False,
                  min_df=0, ngram=1, stopwords=None, limit_train=None,
-                 map_to_lex=False, duplicates=False):
+                 map_to_lex=False, duplicates=False, negations=None,sentenceStarter=None):
         """
         Parameter description:
             - `classifier`: The type of classifier used as main classifier,
@@ -91,21 +92,35 @@ class PhraseSentimentPredictor:
         self.duplicates = duplicates
 
         # Build pre-processing common to every extraction
+        # pipeline2=[ExtractText(lowercase)]
+        # ext2=[build_text_extraction(min_df=min_df,
+        #                              ngram=ngram, stopwords=stopwords)]
+
+
+
         pipeline = [ExtractText(lowercase)]
+
         if text_replacements:
             pipeline.append(ReplaceText(text_replacements))
 
         # Build feature extraction schemes
+
         ext = [build_text_extraction(binary=binary, min_df=min_df,
-                                     ngram=ngram, stopwords=stopwords)]
+                                     ngram=ngram, stopwords=stopwords,negations=negations,sentenceStarter=sentenceStarter)]
         if map_to_synsets:
             ext.append(build_synset_extraction(binary=binary, min_df=min_df,
-                                               ngram=ngram))
+                                               ngram=ngram,negations=negations,sentenceStarter=sentenceStarter))
         if map_to_lex:
             ext.append(build_lex_extraction(binary=binary, min_df=min_df,
-                                            ngram=ngram))
+                                            ngram=ngram,negations=negations,sentenceStarter=sentenceStarter))
+        #ext.append(build_senti_extraction())
+
         ext = make_union(*ext)
         pipeline.append(ext)
+
+        #pipeline2=[ExtractText(lowercase)]
+        #ext = [build_text_extraction(min_df=min_df,ngram=ngram,stopwords=stopwords)]
+        #ext.append(build_senti_extraction())
 
         # Build classifier and put everything togheter
         if classifier_args is None:
@@ -163,8 +178,10 @@ class PhraseSentimentPredictor:
         return matrix
 
 
-def build_text_extraction(binary, min_df, ngram, stopwords):
-    return make_pipeline(CountVectorizer(binary=binary,
+def build_text_extraction(binary, min_df, ngram, stopwords,negations,sentenceStarter):
+    return make_pipeline(ReplaceNegation(negations=negations,sentenceStarter=sentenceStarter),
+                         ExtractLemma(),
+                         CountVectorizer(binary=binary,
                                          tokenizer=lambda x: x.split(),
                                          min_df=min_df,
                                          ngram_range=(1, ngram),
@@ -172,8 +189,9 @@ def build_text_extraction(binary, min_df, ngram, stopwords):
                          ClassifierOvOAsFeatures())
 
 
-def build_synset_extraction(binary, min_df, ngram):
-    return make_pipeline(MapToSynsets(),
+def build_synset_extraction(binary, min_df, ngram,negations,sentenceStarter):
+    return make_pipeline(ReplaceNegation(negations=negations,sentenceStarter=sentenceStarter),
+                         MapToSynsets(),
                          CountVectorizer(binary=binary,
                                          tokenizer=lambda x: x.split(),
                                          min_df=min_df,
@@ -181,14 +199,24 @@ def build_synset_extraction(binary, min_df, ngram):
                          ClassifierOvOAsFeatures())
 
 
-def build_lex_extraction(binary, min_df, ngram):
-    return make_pipeline(InquirerLexTransform(),
+def build_lex_extraction(binary, min_df, ngram,negations,sentenceStarter):
+    return make_pipeline(ReplaceNegation(negations=negations,sentenceStarter=sentenceStarter),
+                         InquirerLexTransform(),
                          CountVectorizer(binary=binary,
                                          tokenizer=lambda x: x.split(),
                                          min_df=min_df,
                                          ngram_range=(1, ngram)),
                          Densifier())
 
+def build_part_of_speech(binary, min_df, ngram):
+    return make_pipeline(MapToPartOfSpeech(),
+                         CountVectorizer(binary=binary,
+                                         tokenizer=lambda x: x.split(),
+                                         min_df=min_df,
+                                         ngram_range=(1, ngram)),
+                         ClassifierOvOAsFeatures())
+def build_senti_extraction():
+    return make_pipeline(MapToSenti())
 
 class DuplicatesHandler:
     def fit(self, phrases, target):
